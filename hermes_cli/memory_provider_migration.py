@@ -52,6 +52,37 @@ def catalog_source(name: str) -> Optional[str]:
     return entry.name if entry is not None else None
 
 
+def catalog_install_hint(name: str, *, category: Optional[str] = None) -> Optional[str]:
+    """``hermes [-p <profile>] plugins install <name>`` when this checkout's catalog ships plugin
+    *name* (of *category*, when given), else None.
+
+    Recovery copy for a provider that left core and is not installed (offline, lazy installs off, a
+    failed migration): doctor, ``memory status``, ``memory setup <name>`` and the CLI's unknown-command
+    error point at the one command that fixes it. In-tree catalog only, never the network — these run
+    offline and on error paths. ``-p`` names the active home's profile whenever a bare command would
+    land elsewhere (a named profile, or the default home while another profile is sticky)."""
+    try:
+        from hermes_cli.plugin_catalog import get_catalog_entry
+        entry = get_catalog_entry(name) if name else None
+    except Exception:
+        return None
+    if entry is None or (category is not None and entry.category != category):
+        return None
+    return f"hermes {_profile_flag()}plugins install {name}"
+
+
+def _profile_flag() -> str:
+    try:
+        from hermes_constants import get_hermes_home, profile_name_for_home
+        profile = profile_name_for_home(get_hermes_home())
+        if profile == "default":
+            from hermes_cli.profiles import get_active_profile
+            return "" if get_active_profile() == "default" else "-p default "
+        return f"-p {profile} " if profile else ""
+    except Exception:
+        return ""
+
+
 def migrate_home(home: Path, *, install: Callable[[str], dict], say: Callable[[str], None] = print) -> Optional[str]:
     """Install the configured provider's catalog plugin into *home* when the provider is gone.
 
